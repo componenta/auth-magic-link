@@ -35,10 +35,22 @@ final class MagicLinkStrategyTest extends TestCase
             new DateTimeImmutable('2030-01-01T00:00:00+00:00'),
             new DateTimeImmutable('2030-01-01T00:05:00+00:00'),
             new DateTimeImmutable('2030-01-01T00:01:00+00:00'),
+            binding: $binding->toString(),
         );
         $tokens = $this->createMock(TokenManagerInterface::class);
         $tokens->expects(self::once())
             ->method('consume')
+            ->with(
+                self::callback(
+                    static fn(TokenCredential $value): bool =>
+                        $value->toString() === $credential->toString(),
+                ),
+                self::callback(
+                    static fn(TokenPurpose $purpose): bool =>
+                        $purpose->value === 'magic_link',
+                ),
+                $binding->toString(),
+            )
             ->willReturn($record);
         $identities = $this->createStub(IdentityProviderInterface::class);
         $identities->method('findByUuid')->willReturn($identity);

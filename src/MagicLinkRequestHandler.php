@@ -78,6 +78,7 @@ final readonly class MagicLinkRequestHandler implements RequestHandlerInterface
             context: [
                 'binding' => $grant->transaction->uuid->toString(),
             ],
+            binding: $grant->transaction->uuid->toString(),
         );
 
         try {

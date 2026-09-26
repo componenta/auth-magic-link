@@ -60,6 +60,7 @@ final readonly class MagicLinkStrategy implements AuthenticationStrategyInterfac
         $record = $this->tokens->consume(
             $payload->credential,
             $this->purpose,
+            $payload->bindingId->toString(),
         );
 
         if ($record === null) {
