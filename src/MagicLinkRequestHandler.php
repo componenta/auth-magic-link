@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Componenta\Auth\MagicLink;
 
+use Componenta\Auth\Session\Http\PreAuthenticationGrantPublisher;
+use Componenta\Auth\Session\PreAuthenticationManagerInterface;
 use Componenta\Auth\Token\TokenPurpose;
 use Componenta\Auth\Token\TokenRequest;
 use Componenta\Auth\Token\TokenRequestQueueInterface;
@@ -16,8 +18,11 @@ final readonly class MagicLinkRequestHandler implements RequestHandlerInterface
 {
     public function __construct(
         private TokenRequestQueueInterface $queue,
+        private PreAuthenticationManagerInterface $preAuthentication,
+        private PreAuthenticationGrantPublisher $publisher,
         private ResponseFactoryInterface $responses,
         private string $identityField = 'identity',
+        private int $preAuthenticationTtlSeconds = 600,
     ) {
         if (
             preg_match(
@@ -27,6 +32,15 @@ final readonly class MagicLinkRequestHandler implements RequestHandlerInterface
         ) {
             throw new \InvalidArgumentException(
                 'Magic-link identity field is invalid.',
+            );
+        }
+
+        if (
+            $this->preAuthenticationTtlSeconds < 30
+            || $this->preAuthenticationTtlSeconds > 1800
+        ) {
+            throw new \InvalidArgumentException(
+                'Magic-link pre-authentication TTL is invalid.',
             );
         }
     }
@@ -54,11 +68,28 @@ final readonly class MagicLinkRequestHandler implements RequestHandlerInterface
         $response = $this->json(200, [
             'message' => 'If the account exists, a link has been sent.',
         ]);
-
-        $this->queue->enqueue(new TokenRequest(
+        $grant = $this->preAuthentication->create(
+            $this->preAuthenticationTtlSeconds,
+        );
+        $response = $this->publisher->publish($response, $grant);
+        $work = new TokenRequest(
             identity: $identity,
             purpose: new TokenPurpose('magic_link'),
-        ));
+            context: [
+                'binding' => $grant->transaction->uuid->toString(),
+            ],
+        );
+
+        try {
+            $this->queue->enqueue($work);
+        } catch (\Throwable $exception) {
+            $this->preAuthentication->consume(
+                $grant->credential,
+                $grant->requestToken,
+            );
+
+            throw $exception;
+        }
 
         return $response;
     }
