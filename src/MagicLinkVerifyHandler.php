@@ -15,6 +15,7 @@ use Componenta\Auth\Session\Http\AuthSessionGrantPublisher;
 use Componenta\Auth\Session\Http\PreAuthenticationConsumer;
 use Componenta\Auth\Session\Http\PreAuthenticationGrantPublisher;
 use Componenta\Auth\Session\Http\SessionMetadataExtractorInterface;
+use Componenta\Auth\Session\PreAuthenticationTransaction;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -52,7 +53,12 @@ final readonly class MagicLinkVerifyHandler implements RequestHandlerInterface
             return $this->denied(new InvalidMagicLink());
         }
 
-        if ($this->preAuthentication->verify($request) === null) {
+        $preAuthentication = $this->preAuthentication->verify($request);
+
+        if (
+            $preAuthentication === null
+            || !$payload->bindingId->equals($preAuthentication->uuid)
+        ) {
             return $this->denied(new InvalidMagicLink());
         }
 
@@ -65,6 +71,7 @@ final readonly class MagicLinkVerifyHandler implements RequestHandlerInterface
         $result = $this->authenticator->attempt($payload, new Context([
             ServerRequestInterface::class => $request,
             ContextInterface::EXTRACTOR => $this->extractor,
+            PreAuthenticationTransaction::class => $preAuthentication,
         ]));
 
         if ($result->subject instanceof DeniedReasonInterface) {
@@ -77,8 +84,12 @@ final readonly class MagicLinkVerifyHandler implements RequestHandlerInterface
             ?? throw new \LogicException(
                 'Successful magic-link authentication must contain evidence.',
             );
+        $consumed = $this->preAuthentication->consume($request);
 
-        if ($this->preAuthentication->consume($request) === null) {
+        if (
+            $consumed === null
+            || !$payload->bindingId->equals($consumed->uuid)
+        ) {
             return $this->preAuthenticationPublisher->clear(
                 $this->denied(new InvalidMagicLink()),
             );
