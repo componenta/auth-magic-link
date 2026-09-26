@@ -70,16 +70,17 @@ final readonly class MagicLinkExtractor implements PayloadExtractorInterface
         }
 
         try {
-            return new MagicLinkPayload(
-                TokenCredential::fromString($rawToken),
-                Uuid::fromString($rawBinding),
-            );
+            $credential = TokenCredential::fromString($rawToken);
         } catch (\InvalidArgumentException) {
-            throw InvalidPayloadException::invalidField(
-                !is_string($rawBinding) || $rawBinding === ''
-                    ? $this->bindingField
-                    : $this->tokenField,
-            );
+            throw InvalidPayloadException::invalidField($this->tokenField);
         }
+
+        try {
+            $binding = Uuid::fromString($rawBinding);
+        } catch (\InvalidArgumentException) {
+            throw InvalidPayloadException::invalidField($this->bindingField);
+        }
+
+        return new MagicLinkPayload($credential, $binding);
     }
 }
