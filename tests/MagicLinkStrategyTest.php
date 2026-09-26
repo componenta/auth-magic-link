@@ -69,7 +69,10 @@ final class MagicLinkStrategyTest extends TestCase
 
         self::assertSame($identity, $result->subject);
         self::assertSame(['magic_link'], $result->evidence?->methods);
-        self::assertSame(['possession'], $result->evidence?->capabilities);
+        self::assertSame(
+            ['one_time_link'],
+            $result->evidence?->capabilities,
+        );
     }
 
     public function testMismatchedBindingDoesNotConsumeToken(): void

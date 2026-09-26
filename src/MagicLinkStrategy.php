@@ -80,7 +80,7 @@ final readonly class MagicLinkStrategy implements AuthenticationStrategyInterfac
             subject: $identity,
             evidence: new AuthenticationEvidence(
                 methods: ['magic_link'],
-                capabilities: ['possession'],
+                capabilities: ['one_time_link'],
             ),
         );
     }

@@ -14,3 +14,8 @@ consumed. This prevents login-CSRF/session-swapping and intentionally does not
 model cross-device magic links.
 
 One-time bearer persistence is delegated to `componenta/auth-token`.
+
+Magic-link evidence is intentionally classified as `one_time_link`, not as a
+generic possession factor and not as phishing resistant. In particular, an
+email-delivered link must not accidentally satisfy an assurance policy that
+expects a cryptographic possession authenticator.
