@@ -5,12 +5,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
-        "componenta/auth": "dev-auth-3",
-        "componenta/auth-http": "dev-main",
-        "componenta/auth-session": "dev-main",
-        "componenta/auth-session-http": "dev-main",
-        "componenta/auth-token": "dev-main",
-        "componenta/identity": "^1.0",
+        "componenta/auth": "^3.0",
+        "componenta/auth-http": "^1.0",
+        "componenta/auth-session": "^1.0",
+        "componenta/auth-session-http": "^1.0",
+        "componenta/auth-token": "^1.0",
+        "componenta/identity": "^1.0.1",
         "psr/http-factory": "^1.0",
         "psr/http-message": "^2.0",
         "psr/http-server-handler": "^1.0"
@@ -31,19 +31,43 @@
         }
     },
     "repositories": [
-        {"type": "vcs", "url": "https://github.com/componenta/auth.git"},
-        {"type": "vcs", "url": "https://github.com/componenta/auth-http.git"},
-        {"type": "vcs", "url": "https://github.com/componenta/auth-session.git"},
-        {"type": "vcs", "url": "https://github.com/componenta/auth-session-http.git"},
-        {"type": "vcs", "url": "https://github.com/componenta/auth-token.git"}
+        {
+            "type": "vcs",
+            "url": "https://github.com/componenta/auth.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/componenta/auth-http.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/componenta/auth-session.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/componenta/auth-session-http.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/componenta/auth-token.git"
+        }
     ],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
-    "extra": {"branch-alias": {"dev-main": "1.0.x-dev"}},
-    "config": {"sort-packages": true},
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
     "scripts": {
         "test": "@php vendor/bin/phpunit --configuration phpunit.xml.dist",
         "phpstan": "@php vendor/bin/phpstan analyse src --level=max",
-        "check": ["@phpstan", "@test"]
+        "check": [
+            "@phpstan",
+            "@test"
+        ]
     }
 }
