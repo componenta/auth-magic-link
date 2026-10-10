@@ -19,3 +19,13 @@ Magic-link evidence is intentionally classified as `one_time_link`, not as a
 generic possession factor and not as phishing resistant. In particular, an
 email-delivered link must not accidentally satisfy an assurance policy that
 expects a cryptographic possession authenticator.
+
+## Version 2 compatibility
+
+This line requires `componenta/auth-session-http ^2.0.1`, and therefore the
+CSRF v3 browser security contract. Unsafe CSRF-protected requests must include
+valid Origin/Referer evidence as well as an admitted CSRF token; missing source
+metadata is denied, not bypassed.
+
+See [CHANGELOG.md](CHANGELOG.md) for coordinated migration details.
+Authentication still uses Componenta Auth's shared session issuer.
