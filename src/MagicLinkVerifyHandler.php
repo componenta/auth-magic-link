@@ -8,6 +8,7 @@ use Componenta\Auth\AuthenticatorInterface;
 use Componenta\Auth\Context;
 use Componenta\Auth\ContextInterface;
 use Componenta\Auth\DeniedReasonInterface;
+use Componenta\Auth\Http\CredentialTransportState;
 use Componenta\Auth\Http\DeniedResponseFactoryInterface;
 use Componenta\Auth\MagicLink\Denied\InvalidMagicLink;
 use Componenta\Auth\Session\AuthenticatedSessionIssuer;
@@ -93,6 +94,12 @@ final readonly class MagicLinkVerifyHandler implements RequestHandlerInterface
             return $this->preAuthenticationPublisher->clear(
                 $this->denied(new InvalidMagicLink()),
             );
+        }
+
+        $transportState = $request->getAttribute(CredentialTransportState::class);
+
+        if ($transportState instanceof CredentialTransportState) {
+            $transportState->discardQueued();
         }
 
         $grant = $this->sessionIssuer->issue(
