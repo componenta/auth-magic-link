@@ -18,11 +18,67 @@ use Componenta\Identity\Uuid;
 use DateTimeImmutable;
 use Nyholm\Psr7\Response;
 use Nyholm\Psr7\ServerRequest;
+use Nyholm\Psr7\Stream;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
+use Psr\Http\Message\ResponseInterface;
 
 final class MagicLinkRequestHandlerTest extends TestCase
 {
+    /** @return iterable<string, array{string}> */
+    public static function failedPublicationHeaders(): iterable
+    {
+        yield 'cookie' => ['Set-Cookie'];
+        yield 'request token' => ['X-Pre-Auth-Token'];
+        yield 'cache policy' => ['Pragma'];
+    }
+
+    #[DataProvider('failedPublicationHeaders')]
+    public function testPublicationFailureConsumesCreatedPreAuthGrant(string $failedHeader): void
+    {
+        $grant = self::grant();
+        $manager = new MagicLinkPreAuthManagerFixture($grant);
+        $queue = new MagicLinkQueueFixture();
+        $failure = new \RuntimeException('response publication failed');
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn(Stream::create(''));
+        $response->method('getHeader')->willReturn([]);
+        $response->method('withoutHeader')->willReturnSelf();
+        $writeHeader = static function (string $name, mixed $value) use (
+            $manager,
+            $failedHeader,
+            $failure,
+            $response,
+        ): ResponseInterface {
+            if ($manager->createdTtl !== null && $name === $failedHeader) {
+                throw $failure;
+            }
+
+            return $response;
+        };
+        $response->method('withHeader')->willReturnCallback($writeHeader);
+        $response->method('withAddedHeader')->willReturnCallback($writeHeader);
+        $responses = $this->createStub(ResponseFactoryInterface::class);
+        $responses->method('createResponse')->willReturn($response);
+
+        try {
+            (new MagicLinkRequestHandler(
+                $queue,
+                $manager,
+                new PreAuthenticationGrantPublisher(new PreAuthenticationCookieTransport()),
+                $responses,
+            ))->handle((new ServerRequest('POST', '/magic-link'))
+                ->withParsedBody(['identity' => 'user@example.test']));
+            self::fail('The response failure must be propagated.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame($failure, $exception);
+        }
+
+        self::assertSame(1, $manager->consumptions);
+        self::assertNull($queue->request);
+    }
+
     public function testRequestCreatesBrowserBindingAndQueuesSameTransaction(): void
     {
         $grant = self::grant();
@@ -45,6 +101,7 @@ final class MagicLinkRequestHandlerTest extends TestCase
         ))->handle($request);
 
         self::assertSame(600, $manager->createdTtl);
+        self::assertSame(0, $manager->consumptions);
         self::assertInstanceOf(TokenRequest::class, $queue->request);
         self::assertSame('user@example.com', $queue->request->identity);
         self::assertSame('magic_link', $queue->request->purpose->value);

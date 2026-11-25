@@ -71,17 +71,16 @@ final readonly class MagicLinkRequestHandler implements RequestHandlerInterface
         $grant = $this->preAuthentication->create(
             $this->preAuthenticationTtlSeconds,
         );
-        $response = $this->publisher->publish($response, $grant);
-        $work = new TokenRequest(
-            identity: $identity,
-            purpose: new TokenPurpose('magic_link'),
-            context: [
-                'binding' => $grant->transaction->uuid->toString(),
-            ],
-            binding: $grant->transaction->uuid->toString(),
-        );
-
         try {
+            $response = $this->publisher->publish($response, $grant);
+            $work = new TokenRequest(
+                identity: $identity,
+                purpose: new TokenPurpose('magic_link'),
+                context: [
+                    'binding' => $grant->transaction->uuid->toString(),
+                ],
+                binding: $grant->transaction->uuid->toString(),
+            );
             $this->queue->enqueue($work);
         } catch (\Throwable $exception) {
             $this->preAuthentication->consume(
