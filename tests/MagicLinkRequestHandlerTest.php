@@ -23,9 +23,80 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 final class MagicLinkRequestHandlerTest extends TestCase
 {
+    /** @return iterable<string, array{string}> */
+    public static function responseStreams(): iterable
+    {
+        foreach (['complete', 'partial', 'stalled', 'throwing'] as $mode) {
+            yield $mode => [$mode];
+        }
+    }
+
+    #[DataProvider('responseStreams')]
+    public function testCompleteBodyIsPreparedBeforeCreatingOrQueuingAGrant(string $mode): void
+    {
+        $manager = new MagicLinkPreAuthManagerFixture(self::grant());
+        $queue = new MagicLinkQueueFixture();
+        $sink = new class {
+            public string $body = '';
+            public int $calls = 0;
+        };
+        $failure = new \RuntimeException('Synthetic stream failure.');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('write')->willReturnCallback(static function (string $bytes) use ($sink, $mode, $failure): int {
+            if (++$sink->calls > 1) {
+                if ($mode === 'stalled') {
+                    return 0;
+                }
+                if ($mode === 'throwing') {
+                    throw $failure;
+                }
+            }
+
+            $written = $mode === 'complete' ? strlen($bytes) : min(7, strlen($bytes));
+            $sink->body .= substr($bytes, 0, $written);
+
+            return $written;
+        });
+        $stream->method('__toString')->willReturnCallback(static fn(): string => $sink->body);
+        $responses = $this->createStub(ResponseFactoryInterface::class);
+        $responses->method('createResponse')->willReturn(new Response(200, [], $stream));
+        $handler = new MagicLinkRequestHandler($queue, $manager,
+            new PreAuthenticationGrantPublisher(new PreAuthenticationCookieTransport()), $responses);
+        $failureObserved = null;
+        $response = null;
+
+        try {
+            $response = $handler->handle((new ServerRequest('POST', '/magic-link'))
+                ->withParsedBody(['identity' => 'user@example.test']));
+        } catch (\RuntimeException $exception) {
+            $failureObserved = $exception;
+        }
+
+        if (in_array($mode, ['stalled', 'throwing'], true)) {
+            self::assertInstanceOf(\RuntimeException::class, $failureObserved, 'Incomplete response must not be returned as success.');
+            self::assertNull($response);
+            self::assertNull($manager->createdTtl);
+            self::assertNull($queue->request);
+            if ($mode === 'throwing') {
+                self::assertSame($failure, $failureObserved);
+            }
+
+            return;
+        }
+
+        self::assertNull($failureObserved);
+        self::assertInstanceOf(ResponseInterface::class, $response);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJson((string) $response->getBody());
+        self::assertArrayHasKey('message', json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(600, $manager->createdTtl);
+        self::assertInstanceOf(TokenRequest::class, $queue->request);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function failedPublicationHeaders(): iterable
     {
